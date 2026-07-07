@@ -1,0 +1,45 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: CompositeResourceDefinition
+metadata:
+  name: xeksclusters.platform.example.com
+spec:
+  group: platform.example.com
+  names:
+    kind: XEKSCluster
+    plural: xeksclusters
+  claimNames:
+    kind: EKSCluster
+    plural: eksclusters
+  versions:
+    - name: v1alpha1
+      served: true
+      referenceable: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                version:
+                  type: string
+                  enum: ["1.28", "1.29", "1.30"]
+                  default: "1.29"
+                nodeSize:
+                  type: string
+                  enum: [small, medium, large]
+                nodeCount:
+                  type: integer
+                  minimum: 1
+                  maximum: 10
+                  default: 3
+              required: [nodeSize]
+            status:
+              type: object
+              properties:
+                clusterEndpoint:
+                  type: string
+                clusterArn:
+                  type: string
+                nodeGroupStatus:
+                  type: string

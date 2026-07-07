@@ -1,0 +1,101 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: floci
+  namespace: floci
+  labels:
+    app: floci
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: floci
+  template:
+    metadata:
+      labels:
+        app: floci
+    spec:
+      containers:
+        - name: floci
+          image: floci/floci:latest
+          ports:
+            - containerPort: 4566
+          env:
+            - name: FLOCI_STORAGE_MODE
+              value: hybrid
+            - name: FLOCI_SERVICES
+              value: s3,dynamodb,sqs,sns,lambda,iam,ec2,ecs,eks,ecr,rds,elasticache,kms,secretsmanager,cloudformation,eventbridge,ssm,cloudwatch,route53,sts,autoscaling
+          volumeMounts:
+            - name: floci-data
+              mountPath: /app/data
+          startupProbe:
+            httpGet:
+              path: /_floci/health
+              port: 4566
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 12
+          readinessProbe:
+            httpGet:
+              path: /_floci/health
+              port: 4566
+            periodSeconds: 10
+          resources:
+            requests:
+              memory: 256Mi
+              cpu: 250m
+            limits:
+              memory: 512Mi
+              cpu: 500m
+      volumes:
+        - name: floci-data
+          emptyDir: {}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: floci-dash
+  namespace: floci
+  labels:
+    app: floci-dash
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: floci-dash
+  template:
+    metadata:
+      labels:
+        app: floci-dash
+    spec:
+      containers:
+        - name: floci-dash
+          image: ghcr.io/ofsazib/floci-dash:latest
+          ports:
+            - containerPort: 3000
+          env:
+            - name: FLOCI_URL
+              value: http://floci.floci.svc.cluster.local:4566
+            - name: AWS_REGION
+              value: us-east-1
+            - name: NODE_ENV
+              value: production
+          startupProbe:
+            httpGet:
+              path: /api/healthz
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 6
+          readinessProbe:
+            httpGet:
+              path: /api/healthz
+              port: 3000
+            periodSeconds: 10
+          resources:
+            requests:
+              memory: 256Mi
+              cpu: 250m
+            limits:
+              memory: 512Mi
+              cpu: 500m

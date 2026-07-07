@@ -1,0 +1,243 @@
+version: '3'
+
+vars:
+  CLUSTER_NAME: crossplane-demo
+  REPO_URL:
+    sh: git remote get-url origin 2>/dev/null || echo ""
+  DASHBOARD_PORT: 9877
+  CROSSVIEW_PORT: 8080
+  ARGOCD_PORT: 8443
+  BACKSTAGE_PORT: 7007
+
+tasks:
+  default:
+    desc: Show available tasks
+    silent: true
+    cmds:
+      - task --list
+
+  setup:
+    desc: Bootstrap the platform (new kind cluster + ArgoCD + app-of-apps)
+    preconditions:
+      - sh: command -v docker
+        msg: "docker is required. Install Docker Desktop first."
+      - sh: command -v kind
+        msg: "kind is required. Install with: brew install kind"
+      - sh: command -v kubectl
+        msg: "kubectl is required. Install with: brew install kubectl"
+      - sh: docker info > /dev/null 2>&1
+        msg: "Docker daemon is not running. Start Docker Desktop first."
+      - sh: '[ -n "{{.REPO_URL}}" ]'
+        msg: "No git remote found. Run from a cloned repo or add a remote with: git remote add origin <url>"
+    cmds:
+      - task: cluster
+      - task: install
+
+  install:
+    desc: Install the platform on an existing cluster (ArgoCD + app-of-apps)
+    preconditions:
+      - sh: kubectl cluster-info > /dev/null 2>&1
+        msg: "No cluster reachable. Check your kubeconfig or run 'task setup' for a new kind cluster."
+      - sh: '[ -n "{{.REPO_URL}}" ]'
+        msg: "No git remote found. Run from a cloned repo or add a remote with: git remote add origin <url>"
+    cmds:
+      - task: argocd
+      - task: apps
+      - echo ""
+      - echo "Setup complete. ArgoCD is now syncing all components."
+      - echo "Run 'task open:argocd' to watch the sync progress."
+      - echo "Run 'task check' to verify all components are healthy."
+
+  cluster:
+    desc: Create a kind cluster
+    cmds:
+      - echo "Creating kind cluster..."
+      - kind create cluster --config kind/cluster.yaml
+      - |
+        echo "Waiting for cluster to be ready..."
+        until kubectl get nodes --no-headers 2>/dev/null | grep -q ' Ready'; do
+          sleep 2
+        done
+        echo "Waiting for core components..."
+        kubectl wait --for=condition=Ready pods --all -n kube-system --timeout=120s
+        echo "Cluster ready."
+    status:
+      - kind get clusters 2>/dev/null | grep -q {{.CLUSTER_NAME}}
+
+  argocd:
+    desc: Install Argo CD
+    deps: [cluster]
+    cmds:
+      - kubectl create namespace argocd 2>/dev/null || true
+      - echo "Installing Argo CD..."
+      - kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+      - echo "Configuring Argo CD..."
+      - kubectl apply -f argocd/crossplane-compat.yaml
+      - kubectl rollout restart deployment/argocd-application-controller -n argocd
+      - kubectl rollout restart deployment/argocd-server -n argocd
+      - echo "Waiting for Argo CD to be ready..."
+      - kubectl rollout status deployment/argocd-server -n argocd --timeout=180s
+      - kubectl rollout status deployment/argocd-application-controller -n argocd --timeout=180s
+      - echo "Argo CD installed."
+
+  apps:
+    desc: Deploy the app-of-apps (ArgoCD syncs everything else)
+    cmds:
+      - |
+        echo "Applying app-of-apps with repo URL: {{.REPO_URL}}"
+        sed "s|REPO_URL_PLACEHOLDER|{{.REPO_URL}}|g" argocd/app-of-apps.yaml | kubectl apply -f -
+      - |
+        echo "Applying individual apps..."
+        for f in apps/*.yaml; do
+          sed "s|REPO_URL_PLACEHOLDER|{{.REPO_URL}}|g" "$f" | kubectl apply -f -
+        done
+      - echo "ArgoCD is now syncing all applications."
+
+  demo:
+    desc: Apply the sample EKSCluster Claim
+    preconditions:
+      - sh: kubectl cluster-info > /dev/null 2>&1
+        msg: "No cluster reachable. Run 'task setup' first."
+    cmds:
+      - echo "Creating sample EKS cluster..."
+      - kubectl apply -f examples/claim.yaml
+      - echo "Watching Claim status..."
+      - |
+        timeout=120
+        elapsed=0
+        while true; do
+          ready=$(kubectl get ekscluster my-cluster --no-headers 2>/dev/null | awk '{print $2}' || true)
+          if [ "$ready" = "True" ]; then
+            echo "EKS cluster is ready!"
+            break
+          fi
+          if [ "$elapsed" -ge "$timeout" ]; then
+            echo "Cluster created. Check status with: task status"
+            break
+          fi
+          echo "  READY: ${ready:-Pending}... ($elapsed s)"
+          sleep 5
+          elapsed=$((elapsed + 5))
+        done
+
+  status:
+    desc: Show the Claim status and resource tree
+    preconditions:
+      - sh: kubectl cluster-info > /dev/null 2>&1
+        msg: "No cluster reachable. Run 'task setup' first."
+    cmds:
+      - echo "=== Claim Status ==="
+      - kubectl get ekscluster -A
+      - echo ""
+      - echo "=== Resource Tree ==="
+      - crossplane beta trace ekscluster my-cluster 2>/dev/null || echo "Install crossplane CLI for trace view"
+      - echo ""
+      - echo "=== Managed Resources ==="
+      - kubectl get managed
+
+  # --- Port-forward tasks for all dashboards ---
+
+  open:argocd:
+    desc: Open Argo CD UI (port-forward)
+    cmds:
+      - echo "Port-forwarding Argo CD to https://localhost:{{.ARGOCD_PORT}}"
+      - echo "Login with admin / (run 'task argocd:password')"
+      - |
+        (sleep 2 && open https://localhost:{{.ARGOCD_PORT}} 2>/dev/null || xdg-open https://localhost:{{.ARGOCD_PORT}} 2>/dev/null) &
+      - kubectl port-forward -n argocd svc/argocd-server {{.ARGOCD_PORT}}:443
+
+  argocd:password:
+    desc: Get the Argo CD admin password
+    cmds:
+      - kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d && echo
+
+  open:dashboard:
+    desc: Open floci-dash — AWS resource view (port-forward)
+    cmds:
+      - echo "Port-forwarding floci-dash to http://localhost:{{.DASHBOARD_PORT}}"
+      - |
+        (sleep 2 && open http://localhost:{{.DASHBOARD_PORT}} 2>/dev/null || xdg-open http://localhost:{{.DASHBOARD_PORT}} 2>/dev/null) &
+      - kubectl port-forward -n floci svc/floci-dash {{.DASHBOARD_PORT}}:3000
+
+  open:crossview:
+    desc: Open Crossview — Crossplane resource view (port-forward)
+    cmds:
+      - echo "Port-forwarding Crossview to http://localhost:{{.CROSSVIEW_PORT}}"
+      - |
+        (sleep 2 && open http://localhost:{{.CROSSVIEW_PORT}} 2>/dev/null || xdg-open http://localhost:{{.CROSSVIEW_PORT}} 2>/dev/null) &
+      - kubectl port-forward -n crossview svc/crossview {{.CROSSVIEW_PORT}}:80
+
+  open:backstage:
+    desc: Open Backstage developer portal (port-forward)
+    cmds:
+      - echo "Port-forwarding Backstage to http://localhost:{{.BACKSTAGE_PORT}}"
+      - |
+        (sleep 2 && open http://localhost:{{.BACKSTAGE_PORT}} 2>/dev/null || xdg-open http://localhost:{{.BACKSTAGE_PORT}} 2>/dev/null) &
+      - kubectl port-forward -n backstage svc/backstage {{.BACKSTAGE_PORT}}:7007
+
+  # --- Health and cleanup ---
+
+  check:
+    desc: Verify all components are running
+    cmds:
+      - echo "=== Kind Cluster ==="
+      - kubectl cluster-info 2>/dev/null && echo "  Cluster OK" || echo "  Cluster NOT running"
+      - echo ""
+      - echo "=== Argo CD ==="
+      - 'kubectl get pods -n argocd --no-headers 2>/dev/null | awk ''{printf "  %-50s %s\n", $1, $3}'' || echo "  Not installed"'
+      - echo ""
+      - echo "=== ArgoCD Applications ==="
+      - 'kubectl get applications -n argocd --no-headers 2>/dev/null | awk ''{printf "  %-25s SYNC=%-10s HEALTH=%s\n", $1, $2, $3}'' || echo "  None"'
+      - echo ""
+      - echo "=== Crossplane ==="
+      - 'kubectl get pods -n crossplane-system --no-headers 2>/dev/null | awk ''{printf "  %-50s %s\n", $1, $3}'' || echo "  Not installed"'
+      - echo ""
+      - echo "=== Providers ==="
+      - 'kubectl get providers --no-headers 2>/dev/null | awk ''{printf "  %-30s INSTALLED=%-6s HEALTHY=%s\n", $1, $2, $3}'' || echo "  None"'
+      - echo ""
+      - echo "=== Functions ==="
+      - 'kubectl get functions --no-headers 2>/dev/null | awk ''{printf "  %-30s INSTALLED=%-6s HEALTHY=%s\n", $1, $2, $3}'' || echo "  None"'
+      - echo ""
+      - echo "=== Floci ==="
+      - 'kubectl get pods -n floci --no-headers 2>/dev/null | awk ''{printf "  %-30s %s\n", $1, $3}'' || echo "  Not deployed"'
+      - echo ""
+      - echo "=== Crossview ==="
+      - 'kubectl get pods -n crossview --no-headers 2>/dev/null | awk ''{printf "  %-30s %s\n", $1, $3}'' || echo "  Not installed"'
+      - echo ""
+      - echo "=== Backstage ==="
+      - 'kubectl get pods -n backstage --no-headers 2>/dev/null | awk ''{printf "  %-30s %s\n", $1, $3}'' || echo "  Not deployed"'
+      - echo ""
+      - echo "=== Platform ==="
+      - 'kubectl get xrd --no-headers 2>/dev/null | awk ''{printf "  XRD: %s\n", $1}'' || echo "  No XRDs"'
+      - 'kubectl get compositions --no-headers 2>/dev/null | awk ''{printf "  Composition: %s\n", $1}'' || echo "  No Compositions"'
+      - echo ""
+      - echo "=== Claims ==="
+      - 'kubectl get ekscluster -A --no-headers 2>/dev/null | awk ''{printf "  %-20s SYNCED=%-6s READY=%s\n", $2, $3, $4}'' || echo "  None"'
+
+  uninstall:
+    desc: Remove the platform from an existing cluster (keeps the cluster)
+    prompt: This will remove all platform components. Are you sure?
+    cmds:
+      - echo "Removing ArgoCD Applications..."
+      - kubectl delete applications --all -n argocd 2>/dev/null || true
+      - echo "Waiting for ArgoCD to clean up resources..."
+      - sleep 10
+      - echo "Removing ArgoCD..."
+      - kubectl delete namespace argocd 2>/dev/null || true
+      - echo "Removing remaining namespaces..."
+      - kubectl delete namespace crossplane-system 2>/dev/null || true
+      - kubectl delete namespace crossview 2>/dev/null || true
+      - kubectl delete namespace floci 2>/dev/null || true
+      - kubectl delete namespace backstage 2>/dev/null || true
+      - echo "Removing cluster-scoped resources..."
+      - kubectl delete clusterrolebinding backstage-read 2>/dev/null || true
+      - kubectl delete xrd xeksclusters.platform.example.com 2>/dev/null || true
+      - echo "Uninstall complete. Cluster is still running."
+
+  teardown:
+    desc: Delete the kind cluster (removes everything)
+    prompt: This will DELETE the entire kind cluster and all data. Are you sure?
+    cmds:
+      - echo "Deleting kind cluster..."
+      - kind delete cluster --name {{.CLUSTER_NAME}} 2>/dev/null || echo "Cluster already deleted."
+      - echo "Done."

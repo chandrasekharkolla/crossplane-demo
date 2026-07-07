@@ -1,0 +1,24 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: crossview
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  project: default
+  source:
+    repoURL: https://crossplane-contrib.github.io/crossview
+    chart: crossview
+    targetRevision: "*"
+    helm:
+      releaseName: crossview
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: crossview
+  syncPolicy:
+    automated:
+      selfHeal: true
+      prune: true
+    syncOptions:
+      - CreateNamespace=true

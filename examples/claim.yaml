@@ -1,0 +1,9 @@
+apiVersion: platform.example.com/v1alpha1
+kind: EKSCluster
+metadata:
+  name: my-cluster
+  namespace: default
+spec:
+  version: "1.29"
+  nodeSize: medium
+  nodeCount: 3

@@ -1,0 +1,150 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: xeksclusters.aws.platform.example.com
+  labels:
+    provider: aws
+spec:
+  compositeTypeRef:
+    apiVersion: platform.example.com/v1alpha1
+    kind: XEKSCluster
+  mode: Pipeline
+  pipeline:
+    - step: generate-resources
+      functionRef:
+        name: function-go-templating
+      input:
+        apiVersion: gotemplating.fn.crossplane.io/v1beta1
+        kind: GoTemplate
+        source: Inline
+        inline:
+          template: |
+            {{- $xr := .observed.composite.resource }}
+            {{- $name := $xr.metadata.name }}
+            {{- $version := default "1.29" $xr.spec.version }}
+            {{- $nodeSize := $xr.spec.nodeSize }}
+            {{- $nodeCount := default 3 $xr.spec.nodeCount }}
+
+            {{- $sizeMap := dict "small" "t3.medium" "medium" "t3.xlarge" "large" "m5.2xlarge" }}
+            {{- $instanceType := index $sizeMap $nodeSize }}
+
+            ---
+            apiVersion: iam.aws.upbound.io/v1beta1
+            kind: Role
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: cluster-role
+              labels:
+                role: eks-cluster
+            spec:
+              forProvider:
+                assumeRolePolicy: |
+                  {
+                    "Version": "2012-10-17",
+                    "Statement": [{
+                      "Effect": "Allow",
+                      "Principal": {"Service": "eks.amazonaws.com"},
+                      "Action": "sts:AssumeRole"
+                    }]
+                  }
+
+            ---
+            apiVersion: iam.aws.upbound.io/v1beta1
+            kind: Role
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: node-role
+              labels:
+                role: eks-node
+            spec:
+              forProvider:
+                assumeRolePolicy: |
+                  {
+                    "Version": "2012-10-17",
+                    "Statement": [{
+                      "Effect": "Allow",
+                      "Principal": {"Service": "ec2.amazonaws.com"},
+                      "Action": "sts:AssumeRole"
+                    }]
+                  }
+
+            ---
+            apiVersion: ec2.aws.upbound.io/v1beta1
+            kind: SecurityGroup
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: cluster-sg
+            spec:
+              forProvider:
+                region: us-east-1
+                vpcId: vpc-0abc123
+                description: "EKS cluster security group for {{ $name }}"
+                name: "{{ $name }}-cluster-sg"
+
+            ---
+            apiVersion: eks.aws.upbound.io/v1beta2
+            kind: Cluster
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: eks-cluster
+            spec:
+              forProvider:
+                region: us-east-1
+                version: "{{ $version }}"
+                roleArnSelector:
+                  matchControllerRef: true
+                  matchLabels:
+                    role: eks-cluster
+                vpcConfig:
+                  - subnetIds:
+                      - subnet-aaa111
+                      - subnet-bbb222
+                    securityGroupIds:
+                      - sg-placeholder
+                    endpointPrivateAccess: true
+                    endpointPublicAccess: true
+
+            ---
+            apiVersion: eks.aws.upbound.io/v1beta2
+            kind: NodeGroup
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: node-group
+            spec:
+              forProvider:
+                region: us-east-1
+                clusterNameSelector:
+                  matchControllerRef: true
+                nodeRoleArnSelector:
+                  matchControllerRef: true
+                  matchLabels:
+                    role: eks-node
+                instanceTypes:
+                  - {{ $instanceType }}
+                scalingConfig:
+                  - desiredSize: {{ $nodeCount }}
+                    minSize: {{ $nodeCount }}
+                    maxSize: {{ $nodeCount }}
+                subnetIds:
+                  - subnet-aaa111
+                  - subnet-bbb222
+
+            ---
+            apiVersion: platform.example.com/v1alpha1
+            kind: XEKSCluster
+            status:
+              {{- if .observed.resources }}
+              {{- $cluster := index .observed.resources "eks-cluster" }}
+              {{- if and $cluster $cluster.resource.status.atProvider }}
+              clusterEndpoint: {{ $cluster.resource.status.atProvider.endpoint | default "" }}
+              clusterArn: {{ $cluster.resource.status.atProvider.arn | default "" }}
+              {{- end }}
+              {{- $ng := index .observed.resources "node-group" }}
+              {{- if and $ng $ng.resource.status.atProvider }}
+              nodeGroupStatus: {{ $ng.resource.status.atProvider.status | default "CREATING" }}
+              {{- end }}
+              {{- end }}
+
+    - step: detect-ready
+      functionRef:
+        name: function-auto-ready
