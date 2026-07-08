@@ -77,7 +77,6 @@ spec:
             spec:
               forProvider:
                 region: us-east-1
-                vpcId: vpc-0abc123
                 description: "EKS cluster security group for {{ $name }}"
                 name: "{{ $name }}-cluster-sg"
 
@@ -97,8 +96,8 @@ spec:
                     role: eks-cluster
                 vpcConfig:
                   - subnetIds:
-                      - subnet-aaa111
-                      - subnet-bbb222
+                      - subnet-default-a
+                      - subnet-default-b
                     securityGroupIds:
                       - sg-placeholder
                     endpointPrivateAccess: true
@@ -126,8 +125,8 @@ spec:
                     minSize: {{ $nodeCount }}
                     maxSize: {{ $nodeCount }}
                 subnetIds:
-                  - subnet-aaa111
-                  - subnet-bbb222
+                  - subnet-default-a
+                  - subnet-default-b
 
             ---
             apiVersion: platform.example.com/v1alpha1
