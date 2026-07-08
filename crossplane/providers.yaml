@@ -2,26 +2,43 @@ apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
   name: provider-family-aws
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
 spec:
-  package: xpkg.upbound.io/upbound/provider-family-aws:v1.17.0
+  package: xpkg.upbound.io/upbound/provider-family-aws:v2.6.1
 ---
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
   name: provider-aws-eks
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
 spec:
-  package: xpkg.upbound.io/upbound/provider-aws-eks:v1.17.0
+  package: xpkg.upbound.io/upbound/provider-aws-eks:v2.6.1
 ---
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
   name: provider-aws-ec2
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
 spec:
-  package: xpkg.upbound.io/upbound/provider-aws-ec2:v1.17.0
+  package: xpkg.upbound.io/upbound/provider-aws-ec2:v2.6.1
 ---
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
   name: provider-aws-iam
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
 spec:
-  package: xpkg.upbound.io/upbound/provider-aws-iam:v1.17.0
+  package: xpkg.upbound.io/upbound/provider-aws-iam:v2.6.1
+---
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-aws-ecs
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  package: xpkg.upbound.io/upbound/provider-aws-ecs:v2.6.1
