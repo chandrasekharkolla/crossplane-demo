@@ -25,6 +25,10 @@ spec:
               value: hybrid
             - name: FLOCI_SERVICES
               value: s3,dynamodb,sqs,sns,lambda,iam,ec2,ecs,eks,ecr,rds,elasticache,kms,secretsmanager,cloudformation,eventbridge,ssm,cloudwatch,route53,sts,autoscaling
+            - name: FLOCI_PORT
+              value: "4566"
+            - name: QUARKUS_HTTP_PORT
+              value: "4566"
           volumeMounts:
             - name: floci-data
               mountPath: /app/data
