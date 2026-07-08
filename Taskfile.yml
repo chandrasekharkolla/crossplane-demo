@@ -73,12 +73,12 @@ tasks:
       - kubectl apply --server-side --force-conflicts -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
       - echo "Configuring Argo CD..."
       - kubectl apply -f argocd/crossplane-compat.yaml
-      - kubectl rollout restart statefulset/argocd-application-controller -n argocd
-      - kubectl rollout restart deployment/argocd-server -n argocd
       - echo "Waiting for Argo CD to be ready..."
       - kubectl rollout status deployment/argocd-server -n argocd --timeout=180s
       - kubectl rollout status statefulset/argocd-application-controller -n argocd --timeout=180s
       - echo "Argo CD installed."
+    status:
+      - kubectl get deployment argocd-server -n argocd -o jsonpath='{.status.readyReplicas}' 2>/dev/null | grep -q '1'
 
   apps:
     desc: Deploy the app-of-apps (ArgoCD syncs everything else)
