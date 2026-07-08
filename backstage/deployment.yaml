@@ -47,7 +47,7 @@ spec:
               value: "7007"
             - name: APP_CONFIG_backend_database_client
               value: better-sqlite3
-            - name: APP_CONFIG_backend_database_connection
+            - name: APP_CONFIG_backend_database_connection_filename
               value: ":memory:"
           startupProbe:
             httpGet:

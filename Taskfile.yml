@@ -165,7 +165,7 @@ tasks:
       - echo "Port-forwarding Crossview to http://localhost:{{.CROSSVIEW_PORT}}"
       - |
         (sleep 2 && open http://localhost:{{.CROSSVIEW_PORT}} 2>/dev/null || xdg-open http://localhost:{{.CROSSVIEW_PORT}} 2>/dev/null) &
-      - kubectl port-forward -n crossview svc/crossview {{.CROSSVIEW_PORT}}:80
+      - kubectl port-forward -n crossview svc/crossview-service {{.CROSSVIEW_PORT}}:80
 
   open:backstage:
     desc: Open Backstage developer portal (port-forward)
