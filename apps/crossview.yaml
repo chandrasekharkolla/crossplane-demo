@@ -13,6 +13,13 @@ spec:
     targetRevision: "*"
     helm:
       releaseName: crossview
+      valuesObject:
+        postgresql:
+          password: crossview
+          securityContext:
+            runAsUser: 999
+            runAsGroup: 999
+            fsGroup: 999
   destination:
     server: https://kubernetes.default.svc
     namespace: crossview
