@@ -16,19 +16,257 @@ tasks:
     cmds:
       - task --list
 
+  prereqs:
+    desc: Install Docker, kind, and kubectl if missing (auto-detects OS)
+    cmds:
+      - task: prereqs:docker
+      - task: prereqs:kind
+      - task: prereqs:kubectl
+      - echo ""
+      - echo "All prerequisites installed. Verifying..."
+      - docker --version
+      - kind --version
+      - kubectl version --client --short 2>/dev/null || kubectl version --client
+      - echo ""
+      - echo "Prerequisites ready. Run 'task setup' to bootstrap the platform."
+
+  prereqs:docker:
+    desc: Install Docker if not present
+    status:
+      - command -v docker
+    cmds:
+      - |
+        OS="$(uname -s)"
+        case "$OS" in
+          Darwin)
+            if command -v brew &>/dev/null; then
+              echo "macOS detected. Choose a Docker runtime:"
+              echo "  1) Docker Desktop (full GUI, default)"
+              echo "  2) Colima + Docker CLI (lightweight, open-source)"
+              read -rp "Enter choice [1]: " choice
+              case "${choice:-1}" in
+                2)
+                  echo "Installing Colima and Docker CLI via Homebrew..."
+                  brew install docker colima
+                  echo "Starting Colima..."
+                  colima start
+                  ;;
+                *)
+                  echo "Installing Docker Desktop via Homebrew..."
+                  brew install --cask docker
+                  echo "Please open Docker Desktop from Applications to complete setup."
+                  echo "Waiting for Docker daemon..."
+                  for i in $(seq 1 30); do
+                    docker info &>/dev/null && break
+                    sleep 2
+                  done
+                  ;;
+              esac
+            else
+              echo "ERROR: Homebrew not found. Install it first: https://brew.sh"
+              exit 1
+            fi
+            ;;
+          Linux)
+            if command -v apt-get &>/dev/null; then
+              echo "Debian/Ubuntu detected. Installing Docker Engine..."
+              sudo apt-get update
+              sudo apt-get install -y ca-certificates curl gnupg
+              sudo install -m 0755 -d /etc/apt/keyrings
+              curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+              sudo chmod a+r /etc/apt/keyrings/docker.gpg
+              echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+              sudo apt-get update
+              sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin
+              sudo usermod -aG docker "$USER"
+              echo "Docker installed. You may need to log out and back in for group changes."
+            elif command -v dnf &>/dev/null; then
+              echo "Fedora/RHEL detected. Installing Docker Engine..."
+              sudo dnf -y install dnf-plugins-core
+              sudo dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo
+              sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin
+              sudo systemctl start docker
+              sudo systemctl enable docker
+              sudo usermod -aG docker "$USER"
+              echo "Docker installed. You may need to log out and back in for group changes."
+            elif command -v yum &>/dev/null; then
+              echo "CentOS/RHEL detected. Installing Docker Engine..."
+              sudo yum install -y yum-utils
+              sudo yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+              sudo yum install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin
+              sudo systemctl start docker
+              sudo systemctl enable docker
+              sudo usermod -aG docker "$USER"
+              echo "Docker installed. You may need to log out and back in for group changes."
+            else
+              echo "ERROR: Unsupported Linux distribution. Install Docker manually: https://docs.docker.com/engine/install/"
+              exit 1
+            fi
+            ;;
+          MINGW*|MSYS*|CYGWIN*)
+            echo "Windows detected. Choose a Docker runtime:"
+            echo "  1) Docker Desktop (full GUI, default)"
+            echo "  2) Rancher Desktop (free, open-source, no license restrictions)"
+            read -rp "Enter choice [1]: " choice
+            case "${choice:-1}" in
+              2)
+                if command -v winget &>/dev/null; then
+                  echo "Installing Rancher Desktop via winget..."
+                  winget install -e --id suse.RancherDesktop --accept-package-agreements --accept-source-agreements
+                elif command -v choco &>/dev/null; then
+                  echo "Installing Rancher Desktop via Chocolatey..."
+                  choco install rancher-desktop -y
+                else
+                  echo "ERROR: Neither winget nor choco found."
+                  echo "Install Rancher Desktop manually: https://rancherdesktop.io/"
+                  exit 1
+                fi
+                echo "Open Rancher Desktop and select 'dockerd (moby)' as the container runtime."
+                ;;
+              *)
+                if command -v winget &>/dev/null; then
+                  echo "Installing Docker Desktop via winget..."
+                  winget install -e --id Docker.DockerDesktop --accept-package-agreements --accept-source-agreements
+                elif command -v choco &>/dev/null; then
+                  echo "Installing Docker Desktop via Chocolatey..."
+                  choco install docker-desktop -y
+                else
+                  echo "ERROR: Neither winget nor choco found."
+                  echo "Install Docker Desktop manually: https://docs.docker.com/desktop/install/windows-install/"
+                  exit 1
+                fi
+                echo "Please open Docker Desktop to complete setup and enable WSL 2 integration."
+                ;;
+            esac
+            ;;
+          *)
+            echo "ERROR: Unsupported OS '$OS'. Install Docker manually: https://docs.docker.com/get-docker/"
+            exit 1
+            ;;
+        esac
+
+  prereqs:kind:
+    desc: Install kind if not present
+    status:
+      - command -v kind
+    cmds:
+      - |
+        OS="$(uname -s)"
+        ARCH="$(uname -m)"
+        case "$ARCH" in
+          x86_64) ARCH="amd64" ;;
+          aarch64|arm64) ARCH="arm64" ;;
+        esac
+        case "$OS" in
+          Darwin)
+            if command -v brew &>/dev/null; then
+              echo "Installing kind via Homebrew..."
+              brew install kind
+            else
+              echo "Installing kind via binary download..."
+              curl -Lo ./kind "https://kind.sigs.k8s.io/dl/latest/kind-darwin-${ARCH}"
+              chmod +x ./kind
+              sudo mv ./kind /usr/local/bin/kind
+            fi
+            ;;
+          Linux)
+            echo "Installing kind via binary download..."
+            curl -Lo ./kind "https://kind.sigs.k8s.io/dl/latest/kind-linux-${ARCH}"
+            chmod +x ./kind
+            sudo mv ./kind /usr/local/bin/kind
+            ;;
+          MINGW*|MSYS*|CYGWIN*)
+            echo "Windows detected."
+            if command -v winget &>/dev/null; then
+              echo "Installing kind via winget..."
+              winget install -e --id Kubernetes.kind --accept-package-agreements --accept-source-agreements
+            elif command -v choco &>/dev/null; then
+              echo "Installing kind via Chocolatey..."
+              choco install kind -y
+            else
+              echo "Installing kind via binary download..."
+              curl -Lo kind.exe "https://kind.sigs.k8s.io/dl/latest/kind-windows-${ARCH}"
+              mkdir -p "$HOME/bin"
+              mv kind.exe "$HOME/bin/kind.exe"
+              echo "Installed to $HOME/bin/kind.exe — ensure $HOME/bin is in your PATH."
+            fi
+            ;;
+          *)
+            echo "ERROR: Unsupported OS '$OS'. Install kind manually: https://kind.sigs.k8s.io/docs/user/quick-start/#installation"
+            exit 1
+            ;;
+        esac
+        echo "kind installed: $(kind --version)"
+
+  prereqs:kubectl:
+    desc: Install kubectl if not present
+    status:
+      - command -v kubectl
+    cmds:
+      - |
+        OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
+        ARCH="$(uname -m)"
+        case "$ARCH" in
+          x86_64) ARCH="amd64" ;;
+          aarch64|arm64) ARCH="arm64" ;;
+        esac
+        case "$(uname -s)" in
+          Darwin)
+            if command -v brew &>/dev/null; then
+              echo "Installing kubectl via Homebrew..."
+              brew install kubectl
+            else
+              echo "Installing kubectl via binary download..."
+              KUBECTL_VERSION=$(curl -L -s https://dl.k8s.io/release/stable.txt)
+              curl -Lo kubectl "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/${OS}/${ARCH}/kubectl"
+              chmod +x ./kubectl
+              sudo mv ./kubectl /usr/local/bin/kubectl
+            fi
+            ;;
+          Linux)
+            echo "Installing kubectl via binary download..."
+            KUBECTL_VERSION=$(curl -L -s https://dl.k8s.io/release/stable.txt)
+            curl -Lo kubectl "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/${OS}/${ARCH}/kubectl"
+            chmod +x ./kubectl
+            sudo mv ./kubectl /usr/local/bin/kubectl
+            ;;
+          MINGW*|MSYS*|CYGWIN*)
+            echo "Windows detected."
+            if command -v winget &>/dev/null; then
+              echo "Installing kubectl via winget..."
+              winget install -e --id Kubernetes.kubectl --accept-package-agreements --accept-source-agreements
+            elif command -v choco &>/dev/null; then
+              echo "Installing kubectl via Chocolatey..."
+              choco install kubernetes-cli -y
+            else
+              echo "Installing kubectl via binary download..."
+              KUBECTL_VERSION=$(curl -L -s https://dl.k8s.io/release/stable.txt)
+              curl -Lo kubectl.exe "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/windows/${ARCH}/kubectl.exe"
+              mkdir -p "$HOME/bin"
+              mv kubectl.exe "$HOME/bin/kubectl.exe"
+              echo "Installed to $HOME/bin/kubectl.exe — ensure $HOME/bin is in your PATH."
+            fi
+            ;;
+          *)
+            echo "ERROR: Unsupported OS. Install kubectl manually: https://kubernetes.io/docs/tasks/tools/"
+            exit 1
+            ;;
+        esac
+        echo "kubectl installed: $(kubectl version --client --short 2>/dev/null || kubectl version --client)"
+
   setup:
     desc: Bootstrap the platform (new kind cluster + ArgoCD + app-of-apps)
     preconditions:
       - sh: command -v docker
-        msg: "docker is required. Install Docker Desktop first."
+        msg: "docker is required. Run 'task prereqs' to install all dependencies."
       - sh: command -v kind
-        msg: "kind is required. Install with: brew install kind"
+        msg: "kind is required. Run 'task prereqs' to install all dependencies."
       - sh: command -v kubectl
-        msg: "kubectl is required. Install with: brew install kubectl"
+        msg: "kubectl is required. Run 'task prereqs' to install all dependencies."
       - sh: docker info > /dev/null 2>&1
-        msg: "Docker daemon is not running. Start Docker Desktop first."
-      - sh: '[ -n "{{.REPO_URL}}" ]'
-        msg: "No git remote found. Run from a cloned repo or add a remote with: git remote add origin <url>"
+        msg: "Docker daemon is not running. Start Docker Desktop or run 'colima start'."
+      - sh: '[ "{{.REPO_URL}}" != "https://github.com/OWNER/REPO" ]'
+        msg: "Set REPO_URL in Taskfile.yml to your Git repo URL before running setup."
     cmds:
       - task: cluster
       - task: install
@@ -38,15 +276,15 @@ tasks:
     preconditions:
       - sh: kubectl cluster-info > /dev/null 2>&1
         msg: "No cluster reachable. Check your kubeconfig or run 'task setup' for a new kind cluster."
-      - sh: '[ -n "{{.REPO_URL}}" ]'
-        msg: "No git remote found. Run from a cloned repo or add a remote with: git remote add origin <url>"
+      - sh: '[ "{{.REPO_URL}}" != "https://github.com/OWNER/REPO" ]'
+        msg: "Set REPO_URL in Taskfile.yml to your Git repo URL before running install."
     cmds:
       - task: argocd
       - task: apps
       - echo ""
-      - echo "Setup complete. ArgoCD is now syncing all components."
-      - echo "Run 'task open:argocd' to watch the sync progress."
       - echo "Run 'task check' to verify all components are healthy."
+      - echo "Opening ArgoCD to watch the sync progress..."
+      - task: argocd:open
 
   cluster:
     desc: Create a kind cluster
@@ -66,10 +304,10 @@ tasks:
 
   argocd:
     desc: Install Argo CD
-    deps: [cluster]
     cmds:
       - kubectl create namespace argocd 2>/dev/null || true
       - echo "Installing Argo CD..."
+      # The applicationsets CRD is too large for client-side apply
       - kubectl apply --server-side --force-conflicts -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
       - echo "Configuring Argo CD..."
       - kubectl apply -f argocd/crossplane-compat.yaml
@@ -95,9 +333,6 @@ tasks:
 
   demo:
     desc: Apply the sample EKSCluster Claim
-    preconditions:
-      - sh: kubectl cluster-info > /dev/null 2>&1
-        msg: "No cluster reachable. Run 'task setup' first."
     cmds:
       - echo "Creating sample EKS cluster..."
       - kubectl apply -f examples/claim.yaml
@@ -122,9 +357,6 @@ tasks:
 
   status:
     desc: Show the Claim status and resource tree
-    preconditions:
-      - sh: kubectl cluster-info > /dev/null 2>&1
-        msg: "No cluster reachable. Run 'task setup' first."
     cmds:
       - echo "=== Claim Status ==="
       - kubectl get ekscluster -A
@@ -137,43 +369,47 @@ tasks:
 
   # --- Port-forward tasks for all dashboards ---
 
-  open:argocd:
+  argocd:open:
     desc: Open Argo CD UI (port-forward)
     cmds:
-      - echo "Port-forwarding Argo CD to https://localhost:{{.ARGOCD_PORT}}"
-      - echo "Login with admin / (run 'task argocd:password')"
+      - echo "Port-forwarding Argo CD to https://localhost:{{.ARGOCD_PORT}} in the background..."
       - |
-        (sleep 2 && open https://localhost:{{.ARGOCD_PORT}} 2>/dev/null || xdg-open https://localhost:{{.ARGOCD_PORT}} 2>/dev/null) &
-      - kubectl port-forward -n argocd svc/argocd-server {{.ARGOCD_PORT}}:443
+        echo "Login with username: admin"
+      - |
+        echo -n "Password: "
+      - kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d && echo
+      - (kubectl port-forward -n argocd svc/argocd-server {{.ARGOCD_PORT}}:443 >/dev/null 2>&1 &)
+      - sleep 2
+      - open https://localhost:{{.ARGOCD_PORT}} 2>/dev/null || xdg-open https://localhost:{{.ARGOCD_PORT}} 2>/dev/null || start https://localhost:{{.ARGOCD_PORT}} 2>/dev/null || true
 
   argocd:password:
     desc: Get the Argo CD admin password
     cmds:
       - kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d && echo
 
-  open:dashboard:
+  dashboard:
     desc: Open floci-dash — AWS resource view (port-forward)
     cmds:
-      - echo "Port-forwarding floci-dash to http://localhost:{{.DASHBOARD_PORT}}"
-      - |
-        (sleep 2 && open http://localhost:{{.DASHBOARD_PORT}} 2>/dev/null || xdg-open http://localhost:{{.DASHBOARD_PORT}} 2>/dev/null) &
-      - kubectl port-forward -n floci svc/floci-dash {{.DASHBOARD_PORT}}:3000
+      - echo "Port-forwarding floci-dash to http://localhost:{{.DASHBOARD_PORT}} in the background..."
+      - (kubectl port-forward -n floci svc/floci-dash {{.DASHBOARD_PORT}}:3000 >/dev/null 2>&1 &)
+      - sleep 2
+      - open http://localhost:{{.DASHBOARD_PORT}} 2>/dev/null || xdg-open http://localhost:{{.DASHBOARD_PORT}} 2>/dev/null || start http://localhost:{{.DASHBOARD_PORT}} 2>/dev/null || true
 
-  open:crossview:
+  crossview:open:
     desc: Open Crossview — Crossplane resource view (port-forward)
     cmds:
-      - echo "Port-forwarding Crossview to http://localhost:{{.CROSSVIEW_PORT}}"
-      - |
-        (sleep 2 && open http://localhost:{{.CROSSVIEW_PORT}} 2>/dev/null || xdg-open http://localhost:{{.CROSSVIEW_PORT}} 2>/dev/null) &
-      - kubectl port-forward -n crossview svc/crossview-service {{.CROSSVIEW_PORT}}:80
+      - echo "Port-forwarding Crossview to http://localhost:{{.CROSSVIEW_PORT}} in the background..."
+      - (kubectl port-forward -n crossview svc/crossview-service {{.CROSSVIEW_PORT}}:80 >/dev/null 2>&1 &)
+      - sleep 2
+      - open http://localhost:{{.CROSSVIEW_PORT}} 2>/dev/null || xdg-open http://localhost:{{.CROSSVIEW_PORT}} 2>/dev/null || start http://localhost:{{.CROSSVIEW_PORT}} 2>/dev/null || true
 
-  open:backstage:
+  backstage:open:
     desc: Open Backstage developer portal (port-forward)
     cmds:
-      - echo "Port-forwarding Backstage to http://localhost:{{.BACKSTAGE_PORT}}"
-      - |
-        (sleep 2 && open http://localhost:{{.BACKSTAGE_PORT}} 2>/dev/null || xdg-open http://localhost:{{.BACKSTAGE_PORT}} 2>/dev/null) &
-      - kubectl port-forward -n backstage svc/backstage {{.BACKSTAGE_PORT}}:7007
+      - echo "Port-forwarding Backstage to http://localhost:{{.BACKSTAGE_PORT}} in the background..."
+      - (kubectl port-forward -n backstage svc/backstage {{.BACKSTAGE_PORT}}:7007 >/dev/null 2>&1 &)
+      - sleep 2
+      - open http://localhost:{{.BACKSTAGE_PORT}} 2>/dev/null || xdg-open http://localhost:{{.BACKSTAGE_PORT}} 2>/dev/null || start http://localhost:{{.BACKSTAGE_PORT}} 2>/dev/null || true
 
   # --- Health and cleanup ---
 
@@ -184,40 +420,43 @@ tasks:
       - kubectl cluster-info 2>/dev/null && echo "  Cluster OK" || echo "  Cluster NOT running"
       - echo ""
       - echo "=== Argo CD ==="
-      - 'kubectl get pods -n argocd --no-headers 2>/dev/null | awk ''{printf "  %-50s %s\n", $1, $3}'' || echo "  Not installed"'
+      - kubectl get pods -n argocd --no-headers 2>/dev/null | awk '{printf "  %-50s %s\n", $1, $3}' || echo "  Not installed"
       - echo ""
       - echo "=== ArgoCD Applications ==="
-      - 'kubectl get applications -n argocd --no-headers 2>/dev/null | awk ''{printf "  %-25s SYNC=%-10s HEALTH=%s\n", $1, $2, $3}'' || echo "  None"'
+      - kubectl get applications -n argocd --no-headers 2>/dev/null | awk '{printf "  %-25s SYNC=%-10s HEALTH=%s\n", $1, $2, $3}' || echo "  None"
       - echo ""
       - echo "=== Crossplane ==="
-      - 'kubectl get pods -n crossplane-system --no-headers 2>/dev/null | awk ''{printf "  %-50s %s\n", $1, $3}'' || echo "  Not installed"'
+      - kubectl get pods -n crossplane-system --no-headers 2>/dev/null | awk '{printf "  %-50s %s\n", $1, $3}' || echo "  Not installed"
       - echo ""
       - echo "=== Providers ==="
-      - 'kubectl get providers --no-headers 2>/dev/null | awk ''{printf "  %-30s INSTALLED=%-6s HEALTHY=%s\n", $1, $2, $3}'' || echo "  None"'
+      - kubectl get providers --no-headers 2>/dev/null | awk '{printf "  %-30s INSTALLED=%-6s HEALTHY=%s\n", $1, $2, $3}' || echo "  None"
       - echo ""
       - echo "=== Functions ==="
-      - 'kubectl get functions --no-headers 2>/dev/null | awk ''{printf "  %-30s INSTALLED=%-6s HEALTHY=%s\n", $1, $2, $3}'' || echo "  None"'
+      - kubectl get functions --no-headers 2>/dev/null | awk '{printf "  %-30s INSTALLED=%-6s HEALTHY=%s\n", $1, $2, $3}' || echo "  None"
       - echo ""
       - echo "=== Floci ==="
-      - 'kubectl get pods -n floci --no-headers 2>/dev/null | awk ''{printf "  %-30s %s\n", $1, $3}'' || echo "  Not deployed"'
+      - kubectl get pods -n floci --no-headers 2>/dev/null | awk '{printf "  %-30s %s\n", $1, $3}' || echo "  Not deployed"
       - echo ""
       - echo "=== Crossview ==="
-      - 'kubectl get pods -n crossview --no-headers 2>/dev/null | awk ''{printf "  %-30s %s\n", $1, $3}'' || echo "  Not installed"'
+      - kubectl get pods -n crossview --no-headers 2>/dev/null | awk '{printf "  %-30s %s\n", $1, $3}' || echo "  Not installed"
       - echo ""
       - echo "=== Backstage ==="
-      - 'kubectl get pods -n backstage --no-headers 2>/dev/null | awk ''{printf "  %-30s %s\n", $1, $3}'' || echo "  Not deployed"'
+      - kubectl get pods -n backstage --no-headers 2>/dev/null | awk '{printf "  %-30s %s\n", $1, $3}' || echo "  Not deployed"
       - echo ""
       - echo "=== Platform ==="
-      - 'kubectl get xrd --no-headers 2>/dev/null | awk ''{printf "  XRD: %s\n", $1}'' || echo "  No XRDs"'
-      - 'kubectl get compositions --no-headers 2>/dev/null | awk ''{printf "  Composition: %s\n", $1}'' || echo "  No Compositions"'
+      - |
+        kubectl get xrd --no-headers 2>/dev/null | awk '{printf "  XRD: %s\n", $1}' || echo "  No XRDs"
+      - |
+        kubectl get compositions --no-headers 2>/dev/null | awk '{printf "  Composition: %s\n", $1}' || echo "  No Compositions"
       - echo ""
       - echo "=== Claims ==="
-      - 'kubectl get ekscluster -A --no-headers 2>/dev/null | awk ''{printf "  %-20s SYNCED=%-6s READY=%s\n", $2, $3, $4}'' || echo "  None"'
+      - kubectl get ekscluster -A --no-headers 2>/dev/null | awk '{printf "  %-20s SYNCED=%-6s READY=%s\n", $2, $3, $4}' || echo "  None"
 
   uninstall:
     desc: Remove the platform from an existing cluster (keeps the cluster)
-    prompt: This will remove all platform components. Are you sure?
     cmds:
+      - echo "Deleting EKS clusters (claims)..."
+      - kubectl delete ekscluster --all 2>/dev/null || true
       - echo "Removing ArgoCD Applications..."
       - kubectl delete applications --all -n argocd 2>/dev/null || true
       - echo "Waiting for ArgoCD to clean up resources..."
@@ -235,9 +474,71 @@ tasks:
       - echo "Uninstall complete. Cluster is still running."
 
   teardown:
-    desc: Delete the kind cluster (removes everything)
-    prompt: This will DELETE the entire kind cluster and all data. Are you sure?
+    desc: Delete the cluster and uninstall all software dependencies
+    prompt: "WARNING: This will completely destroy the cluster AND uninstall Docker, kind, and kubectl from your system. Are you sure?"
     cmds:
+      - task: uninstall
       - echo "Deleting kind cluster..."
       - kind delete cluster --name {{.CLUSTER_NAME}} 2>/dev/null || echo "Cluster already deleted."
+      - task: teardown:softwares
       - echo "Done."
+
+  teardown:softwares:
+    desc: Uninstall Docker, kind, and kubectl (auto-detects OS)
+    internal: true
+    cmds:
+      - |
+        OS="$(uname -s)"
+        echo "Uninstalling kind and kubectl..."
+        case "$OS" in
+          Darwin)
+            if command -v brew &>/dev/null; then
+              brew uninstall kind kubectl 2>/dev/null || true
+            fi
+            sudo rm -f /usr/local/bin/kind /usr/local/bin/kubectl
+            ;;
+          Linux)
+            sudo rm -f /usr/local/bin/kind /usr/local/bin/kubectl
+            ;;
+          MINGW*|MSYS*|CYGWIN*)
+            if command -v winget &>/dev/null; then
+              winget uninstall Kubernetes.kind 2>/dev/null || true
+              winget uninstall Kubernetes.kubectl 2>/dev/null || true
+            fi
+            if command -v choco &>/dev/null; then
+              choco uninstall kind kubernetes-cli -y 2>/dev/null || true
+            fi
+            rm -f "$HOME/bin/kind.exe" "$HOME/bin/kubectl.exe"
+            ;;
+        esac
+      - |
+        OS="$(uname -s)"
+        echo "Uninstalling Docker/Container runtime..."
+        case "$OS" in
+          Darwin)
+            if command -v brew &>/dev/null; then
+              brew uninstall docker colima 2>/dev/null || true
+              brew uninstall --cask docker 2>/dev/null || true
+            fi
+            ;;
+          Linux)
+            if command -v apt-get &>/dev/null; then
+              sudo apt-get purge -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin docker-ce-rootless-extras 2>/dev/null || true
+              sudo apt-get autoremove -y
+            elif command -v dnf &>/dev/null; then
+              sudo dnf remove -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin 2>/dev/null || true
+            elif command -v yum &>/dev/null; then
+              sudo yum remove -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin 2>/dev/null || true
+            fi
+            ;;
+          MINGW*|MSYS*|CYGWIN*)
+            if command -v winget &>/dev/null; then
+              winget uninstall Docker.DockerDesktop 2>/dev/null || true
+              winget uninstall suse.RancherDesktop 2>/dev/null || true
+            fi
+            if command -v choco &>/dev/null; then
+              choco uninstall docker-desktop rancher-desktop -y 2>/dev/null || true
+            fi
+            ;;
+        esac
+        echo "Software uninstallation complete."
