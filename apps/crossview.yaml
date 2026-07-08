@@ -28,6 +28,15 @@ spec:
             readOnlyRootFilesystem: false
             runAsNonRoot: false
             runAsUser: 0
+            capabilities:
+              drop:
+                - NET_RAW
+              add:
+                - CHOWN
+                - DAC_OVERRIDE
+                - FOWNER
+                - SETGID
+                - SETUID
   destination:
     server: https://kubernetes.default.svc
     namespace: crossview
