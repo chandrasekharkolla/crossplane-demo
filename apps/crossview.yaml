@@ -16,6 +16,15 @@ spec:
       valuesObject:
         secrets:
           dbPassword: crossview
+        database:
+          securityContext:
+            runAsNonRoot: false
+            runAsUser: 0
+            fsGroup: 999
+          containerSecurityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: false
+            runAsUser: 0
   destination:
     server: https://kubernetes.default.svc
     namespace: crossview
