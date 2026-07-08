@@ -95,13 +95,13 @@ spec:
                   matchLabels:
                     role: eks-cluster
                 vpcConfig:
-                  - subnetIds:
-                      - subnet-default-a
-                      - subnet-default-b
-                    securityGroupIds:
-                      - sg-placeholder
-                    endpointPrivateAccess: true
-                    endpointPublicAccess: true
+                  subnetIds:
+                    - subnet-default-a
+                    - subnet-default-b
+                  securityGroupIds:
+                    - sg-placeholder
+                  endpointPrivateAccess: true
+                  endpointPublicAccess: true
 
             ---
             apiVersion: eks.aws.upbound.io/v1beta2
@@ -121,9 +121,9 @@ spec:
                 instanceTypes:
                   - {{ $instanceType }}
                 scalingConfig:
-                  - desiredSize: {{ $nodeCount }}
-                    minSize: {{ $nodeCount }}
-                    maxSize: {{ $nodeCount }}
+                  desiredSize: {{ $nodeCount }}
+                  minSize: {{ $nodeCount }}
+                  maxSize: {{ $nodeCount }}
                 subnetIds:
                   - subnet-default-a
                   - subnet-default-b
