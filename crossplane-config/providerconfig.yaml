@@ -16,3 +16,12 @@ spec:
       type: Static
       static: http://floci.floci.svc.cluster.local:4566
     hostnameImmutable: true
+    services:
+      - ec2
+      - iam
+      - eks
+      - rds
+      - dynamodb
+      - sqs
+      - sns
+      - s3
