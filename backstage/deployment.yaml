@@ -38,6 +38,7 @@ spec:
       containers:
         - name: backstage
           image: roadiehq/community-backstage-image:latest
+          command: ["node", "packages/backend", "--config", "app-config.yaml", "--config", "app-config.local.yaml"]
           ports:
             - containerPort: 7007
           env:
