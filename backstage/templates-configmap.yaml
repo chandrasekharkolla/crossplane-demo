@@ -228,8 +228,57 @@ data:
           name: Print Output Path
           action: debug:log
           input:
-            message: "Successfully generated Crossplane YAML in the workspace!"
+            message: |
+              Successfully generated Crossplane YAML!
+              
+              apiVersion: platform.example.org/v1alpha1
+              kind: KubernetesApp
+              metadata:
+                name: ${{ parameters.appName }}
+                namespace: ${{ parameters.namespace }}
+              spec:
+                appName: ${{ parameters.appName }}
+                namespace: ${{ parameters.namespace }}
+                environment: ${{ parameters.environment }}
+                image: ${{ parameters.image }}
+                replicas: ${{ parameters.replicas }}
+                imagePullPolicy: ${{ parameters.imagePullPolicy }}
+                cpu: ${{ parameters.cpu }}
+                memory: ${{ parameters.memory }}
+                serviceType: ${{ parameters.serviceType }}
+                exposeIngress: ${{ parameters.exposeIngress }}
+                hostname: ${{ parameters.hostname }}
+                kubernetesVersion: "${{ parameters.kubernetesVersion }}"
+                enableHPA: ${{ parameters.enableHPA }}
+                enablePDB: ${{ parameters.enablePDB }}
+                enableNetworkPolicy: ${{ parameters.enableNetworkPolicy }}
 
       output:
         text: |
           **Success:** Kubernetes deployment template generated successfully.
+
+          Here is your Crossplane YAML:
+
+          ```yaml
+          apiVersion: platform.example.org/v1alpha1
+          kind: KubernetesApp
+          metadata:
+            name: ${{ parameters.appName }}
+            namespace: ${{ parameters.namespace }}
+          spec:
+            appName: ${{ parameters.appName }}
+            namespace: ${{ parameters.namespace }}
+            environment: ${{ parameters.environment }}
+            image: ${{ parameters.image }}
+            replicas: ${{ parameters.replicas }}
+            imagePullPolicy: ${{ parameters.imagePullPolicy }}
+            cpu: ${{ parameters.cpu }}
+            memory: ${{ parameters.memory }}
+            serviceType: ${{ parameters.serviceType }}
+            exposeIngress: ${{ parameters.exposeIngress }}
+            hostname: ${{ parameters.hostname }}
+            kubernetesVersion: "${{ parameters.kubernetesVersion }}"
+            enableHPA: ${{ parameters.enableHPA }}
+            enablePDB: ${{ parameters.enablePDB }}
+            enableNetworkPolicy: ${{ parameters.enableNetworkPolicy }}
+          ```
