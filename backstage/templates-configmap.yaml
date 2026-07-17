@@ -190,6 +190,5 @@ data:
               Image: ${{ parameters.image }}
 
       output:
-        text:
-          - title: Success
-            content: Kubernetes deployment template generated successfully.
+        text: |
+          **Success:** Kubernetes deployment template generated successfully.
