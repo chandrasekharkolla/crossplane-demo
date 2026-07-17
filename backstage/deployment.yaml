@@ -64,3 +64,14 @@ spec:
             limits:
               memory: 1Gi
               cpu: 1000m
+          volumeMounts:
+            - name: backstage-templates
+              mountPath: /usr/src/app/templates/kubernetes-app.yaml
+              subPath: kubernetes-app.yaml
+            - name: backstage-templates
+              mountPath: /usr/src/app/app-config.local.yaml
+              subPath: app-config.local.yaml
+      volumes:
+        - name: backstage-templates
+          configMap:
+            name: backstage-templates

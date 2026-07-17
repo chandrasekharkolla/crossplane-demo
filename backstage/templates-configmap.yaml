@@ -1,0 +1,195 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backstage-templates
+  namespace: backstage
+data:
+  app-config.local.yaml: |
+    catalog:
+      locations:
+        # Backstage example components
+        - type: url
+          target: https://github.com/backstage/backstage/tree/master/packages/catalog-model/examples/all-components.yaml
+        # Example component for github-actions and TechDocs
+        - type: url
+          target: https://github.com/backstage/backstage/tree/master/plugins/github-actions/examples/sample.yaml
+        # Example component for TechDocs
+        - type: url
+          target: https://github.com/backstage/backstage/tree/master/plugins/techdocs-backend/examples/documented-component/catalog-info.yaml
+        # Backstage example APIs
+        - type: url
+          target: https://github.com/backstage/backstage/tree/master/packages/catalog-model/examples/all-apis.yaml
+        # Backstage example resources
+        - type: url
+          target: https://github.com/backstage/backstage/tree/master/packages/catalog-model/examples/all-resources.yaml
+        # Backstage example systems
+        - type: url
+          target: https://github.com/backstage/backstage/tree/master/packages/catalog-model/examples/all-systems.yaml
+        # Backstage example domains
+        - type: url
+          target: https://github.com/backstage/backstage/tree/master/packages/catalog-model/examples/all-domains.yaml
+        # Backstage example templates
+        - type: url
+          target: https://github.com/backstage/backstage/tree/master/plugins/scaffolder-backend/sample-templates/all-templates.yaml
+        # Backstage example groups and users
+        - type: url
+          target: https://github.com/backstage/backstage/tree/master/packages/catalog-model/examples/acme-corp.yaml
+        # Our custom template
+        - type: file
+          target: /usr/src/app/templates/kubernetes-app.yaml
+
+  kubernetes-app.yaml: |
+    apiVersion: scaffolder.backstage.io/v1beta3
+    kind: Template
+    metadata:
+      name: kubernetes-app
+      title: Kubernetes Application
+      description: Deploy a sample application to Kubernetes
+    spec:
+      owner: platform-team
+      type: service
+
+      parameters:
+        - title: Application Details
+          required:
+            - appName
+            - namespace
+            - environment
+
+          properties:
+            appName:
+              title: Application Name
+              type: string
+              description: Name of the Kubernetes application
+
+            namespace:
+              title: Namespace
+              type: string
+              default: default
+
+            environment:
+              title: Environment
+              type: string
+              enum:
+                - dev
+                - test
+                - staging
+                - prod
+
+        - title: Container Configuration
+          required:
+            - image
+
+          properties:
+            image:
+              title: Container Image
+              type: string
+              default: nginx:latest
+
+            replicas:
+              title: Replicas
+              type: integer
+              default: 2
+              minimum: 1
+              maximum: 20
+
+            imagePullPolicy:
+              title: Image Pull Policy
+              type: string
+              enum:
+                - Always
+                - IfNotPresent
+                - Never
+              default: IfNotPresent
+
+        - title: Resource Requests
+
+          properties:
+            cpu:
+              title: CPU Request
+              type: string
+              default: 250m
+              enum:
+                - 100m
+                - 250m
+                - 500m
+                - "1"
+
+            memory:
+              title: Memory Request
+              type: string
+              default: 512Mi
+              enum:
+                - 128Mi
+                - 256Mi
+                - 512Mi
+                - 1Gi
+                - 2Gi
+
+        - title: Networking
+
+          properties:
+            serviceType:
+              title: Service Type
+              type: string
+              enum:
+                - ClusterIP
+                - NodePort
+                - LoadBalancer
+              default: ClusterIP
+
+            exposeIngress:
+              title: Create Ingress?
+              type: boolean
+              default: false
+
+            hostname:
+              title: Hostname
+              type: string
+              description: Required if Ingress is enabled
+
+              ui:options:
+                visibleIf:
+                  exposeIngress: true
+
+        - title: Kubernetes Options
+
+          properties:
+            kubernetesVersion:
+              title: Kubernetes Version
+              type: string
+              enum:
+                - "1.29"
+                - "1.30"
+                - "1.31"
+
+            enableHPA:
+              title: Enable Horizontal Pod Autoscaler
+              type: boolean
+              default: false
+
+            enablePDB:
+              title: Create Pod Disruption Budget
+              type: boolean
+              default: true
+
+            enableNetworkPolicy:
+              title: Apply Default Network Policy
+              type: boolean
+              default: true
+
+      steps:
+        - id: log
+          name: Print Input
+          action: debug:log
+          input:
+            message: |
+              Deploying ${{ parameters.appName }}
+              Namespace: ${{ parameters.namespace }}
+              Environment: ${{ parameters.environment }}
+              Image: ${{ parameters.image }}
+
+      output:
+        text:
+          - title: Success
+            content: Kubernetes deployment template generated successfully.
