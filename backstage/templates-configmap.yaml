@@ -39,7 +39,7 @@ data:
           target: /usr/src/app/templates/kubernetes-app.yaml
 
   kubernetes-app.yaml: |
-    apiVersion: scaffolder.backstage.io/v1beta3
+    apiVersion: backstage.io/v1beta2
     kind: Template
     metadata:
       name: kubernetes-app
