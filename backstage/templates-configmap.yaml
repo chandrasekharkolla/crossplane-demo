@@ -8,24 +8,24 @@ data:
     apiVersion: platform.example.org/v1alpha1
     kind: KubernetesApp
     metadata:
-      name: ${{ values.appName }}
-      namespace: ${{ values.namespace }}
+      name: "{{ values.appName }}"
+      namespace: "{{ values.namespace }}"
     spec:
-      appName: ${{ values.appName }}
-      namespace: ${{ values.namespace }}
-      environment: ${{ values.environment }}
-      image: ${{ values.image }}
-      replicas: ${{ values.replicas }}
-      imagePullPolicy: ${{ values.imagePullPolicy }}
-      cpu: ${{ values.cpu }}
-      memory: ${{ values.memory }}
-      serviceType: ${{ values.serviceType }}
-      exposeIngress: ${{ values.exposeIngress }}
-      hostname: ${{ values.hostname }}
-      kubernetesVersion: "${{ values.kubernetesVersion }}"
-      enableHPA: ${{ values.enableHPA }}
-      enablePDB: ${{ values.enablePDB }}
-      enableNetworkPolicy: ${{ values.enableNetworkPolicy }}
+      appName: "{{ values.appName }}"
+      namespace: "{{ values.namespace }}"
+      environment: "{{ values.environment }}"
+      image: "{{ values.image }}"
+      replicas: "{{ values.replicas }}"
+      imagePullPolicy: "{{ values.imagePullPolicy }}"
+      cpu: "{{ values.cpu }}"
+      memory: "{{ values.memory }}"
+      serviceType: "{{ values.serviceType }}"
+      exposeIngress: "{{ values.exposeIngress }}"
+      hostname: "{{ values.hostname }}"
+      kubernetesVersion: "{{ values.kubernetesVersion }}"
+      enableHPA: "{{ values.enableHPA }}"
+      enablePDB: "{{ values.enablePDB }}"
+      enableNetworkPolicy: "{{ values.enableNetworkPolicy }}"
 
   app-config.local.yaml: |
     catalog:
@@ -208,21 +208,21 @@ data:
           input:
             url: ./skeleton
             values:
-              appName: ${{ parameters.appName }}
-              namespace: ${{ parameters.namespace }}
-              environment: ${{ parameters.environment }}
-              image: ${{ parameters.image }}
-              replicas: ${{ parameters.replicas }}
-              imagePullPolicy: ${{ parameters.imagePullPolicy }}
-              cpu: ${{ parameters.cpu }}
-              memory: ${{ parameters.memory }}
-              serviceType: ${{ parameters.serviceType }}
-              exposeIngress: ${{ parameters.exposeIngress }}
-              hostname: ${{ parameters.hostname }}
-              kubernetesVersion: ${{ parameters.kubernetesVersion }}
-              enableHPA: ${{ parameters.enableHPA }}
-              enablePDB: ${{ parameters.enablePDB }}
-              enableNetworkPolicy: ${{ parameters.enableNetworkPolicy }}
+              appName: "{{ parameters.appName }}"
+              namespace: "{{ parameters.namespace }}"
+              environment: "{{ parameters.environment }}"
+              image: "{{ parameters.image }}"
+              replicas: "{{ parameters.replicas }}"
+              imagePullPolicy: "{{ parameters.imagePullPolicy }}"
+              cpu: "{{ parameters.cpu }}"
+              memory: "{{ parameters.memory }}"
+              serviceType: "{{ parameters.serviceType }}"
+              exposeIngress: "{{ parameters.exposeIngress }}"
+              hostname: "{{ parameters.hostname }}"
+              kubernetesVersion: "{{ parameters.kubernetesVersion }}"
+              enableHPA: "{{ parameters.enableHPA }}"
+              enablePDB: "{{ parameters.enablePDB }}"
+              enableNetworkPolicy: "{{ parameters.enableNetworkPolicy }}"
 
         - id: log
           name: Print Output Path
@@ -234,24 +234,24 @@ data:
               apiVersion: platform.example.org/v1alpha1
               kind: KubernetesApp
               metadata:
-                name: ${{ parameters.appName }}
-                namespace: ${{ parameters.namespace }}
+                name: "{{ parameters.appName }}"
+                namespace: "{{ parameters.namespace }}"
               spec:
-                appName: ${{ parameters.appName }}
-                namespace: ${{ parameters.namespace }}
-                environment: ${{ parameters.environment }}
-                image: ${{ parameters.image }}
-                replicas: ${{ parameters.replicas }}
-                imagePullPolicy: ${{ parameters.imagePullPolicy }}
-                cpu: ${{ parameters.cpu }}
-                memory: ${{ parameters.memory }}
-                serviceType: ${{ parameters.serviceType }}
-                exposeIngress: ${{ parameters.exposeIngress }}
-                hostname: ${{ parameters.hostname }}
-                kubernetesVersion: "${{ parameters.kubernetesVersion }}"
-                enableHPA: ${{ parameters.enableHPA }}
-                enablePDB: ${{ parameters.enablePDB }}
-                enableNetworkPolicy: ${{ parameters.enableNetworkPolicy }}
+                appName: "{{ parameters.appName }}"
+                namespace: "{{ parameters.namespace }}"
+                environment: "{{ parameters.environment }}"
+                image: "{{ parameters.image }}"
+                replicas: "{{ parameters.replicas }}"
+                imagePullPolicy: "{{ parameters.imagePullPolicy }}"
+                cpu: "{{ parameters.cpu }}"
+                memory: "{{ parameters.memory }}"
+                serviceType: "{{ parameters.serviceType }}"
+                exposeIngress: "{{ parameters.exposeIngress }}"
+                hostname: "{{ parameters.hostname }}"
+                kubernetesVersion: "{{ parameters.kubernetesVersion }}"
+                enableHPA: "{{ parameters.enableHPA }}"
+                enablePDB: "{{ parameters.enablePDB }}"
+                enableNetworkPolicy: "{{ parameters.enableNetworkPolicy }}"
 
       output:
         text: |
@@ -263,22 +263,22 @@ data:
           apiVersion: platform.example.org/v1alpha1
           kind: KubernetesApp
           metadata:
-            name: ${{ parameters.appName }}
-            namespace: ${{ parameters.namespace }}
+            name: "{{ parameters.appName }}"
+            namespace: "{{ parameters.namespace }}"
           spec:
-            appName: ${{ parameters.appName }}
-            namespace: ${{ parameters.namespace }}
-            environment: ${{ parameters.environment }}
-            image: ${{ parameters.image }}
-            replicas: ${{ parameters.replicas }}
-            imagePullPolicy: ${{ parameters.imagePullPolicy }}
-            cpu: ${{ parameters.cpu }}
-            memory: ${{ parameters.memory }}
-            serviceType: ${{ parameters.serviceType }}
-            exposeIngress: ${{ parameters.exposeIngress }}
-            hostname: ${{ parameters.hostname }}
-            kubernetesVersion: "${{ parameters.kubernetesVersion }}"
-            enableHPA: ${{ parameters.enableHPA }}
-            enablePDB: ${{ parameters.enablePDB }}
-            enableNetworkPolicy: ${{ parameters.enableNetworkPolicy }}
+            appName: "{{ parameters.appName }}"
+            namespace: "{{ parameters.namespace }}"
+            environment: "{{ parameters.environment }}"
+            image: "{{ parameters.image }}"
+            replicas: "{{ parameters.replicas }}"
+            imagePullPolicy: "{{ parameters.imagePullPolicy }}"
+            cpu: "{{ parameters.cpu }}"
+            memory: "{{ parameters.memory }}"
+            serviceType: "{{ parameters.serviceType }}"
+            exposeIngress: "{{ parameters.exposeIngress }}"
+            hostname: "{{ parameters.hostname }}"
+            kubernetesVersion: "{{ parameters.kubernetesVersion }}"
+            enableHPA: "{{ parameters.enableHPA }}"
+            enablePDB: "{{ parameters.enablePDB }}"
+            enableNetworkPolicy: "{{ parameters.enableNetworkPolicy }}"
           ```
