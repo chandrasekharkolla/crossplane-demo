@@ -72,6 +72,9 @@ spec:
             - name: backstage-templates
               mountPath: /usr/src/app/app-config.local.yaml
               subPath: app-config.local.yaml
+            - name: backstage-templates
+              mountPath: /usr/src/app/templates/skeleton/crossplane.yaml
+              subPath: skeleton-crossplane.yaml
       volumes:
         - name: backstage-templates
           configMap:
